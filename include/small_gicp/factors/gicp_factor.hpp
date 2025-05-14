@@ -12,7 +12,9 @@ namespace small_gicp {
 
 /// @brief GICP (distribution-to-distribution) per-point error factor.
 struct GICPFactor {
-  struct Setting {};
+  struct Setting {
+    double voxel_size;
+  };
 
   /// @brief Constructor
   GICPFactor(const Setting& setting = Setting())

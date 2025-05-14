@@ -3,9 +3,12 @@
 # SPDX-License-Identifier: MIT
 import numpy
 from scipy.spatial.transform import Rotation
+import os
 
 import small_gicp
 
+# 데이터 파일 경로 설정
+DATA_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), 'data')
 
 # Basic registation example with numpy arrays
 def example_numpy1(target_raw_numpy : numpy.ndarray, source_raw_numpy : numpy.ndarray):
@@ -175,8 +178,8 @@ def test_example_small2(load_points):
   verify_result(T_target_source, gt_T_target_source)
 
 if __name__ == "__main__":
-  target_raw = small_gicp.read_ply(('data/target.ply'))  # Read the target point cloud (small_gicp.PointCloud)
-  source_raw = small_gicp.read_ply(('data/source.ply'))  # Read the source point cloud (small_gicp.PointCloud)
+  target_raw = small_gicp.read_ply(os.path.join(DATA_DIR, 'target.ply'))  # Read the target point cloud (small_gicp.PointCloud)
+  source_raw = small_gicp.read_ply(os.path.join(DATA_DIR, 'source.ply'))  # Read the source point cloud (small_gicp.PointCloud)
 
   target_raw_numpy = target_raw.points()                    # Nx4 numpy array of the target point cloud
   source_raw_numpy = source_raw.points()                    # Nx4 numpy array of the source point cloud

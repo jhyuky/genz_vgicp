@@ -7,6 +7,8 @@
 
 #include <Eigen/Core>
 #include <Eigen/Geometry>
+#include <memory>               // ★ 추가: std::shared_ptr, std::make_shared 사용을 위해
+#include <algorithm>            // ★ 추가: std::remove_if 사용을 위해
 
 #include <small_gicp/ann/traits.hpp>
 #include <small_gicp/ann/knn_result.hpp>

@@ -236,6 +236,7 @@ endif()
 ## Example ##
 #############
 if(BUILD_EXAMPLES)
+  find_package(Open3D REQUIRED)
   file(GLOB EXAMPLE_SOURCES "src/example/*.cpp")
   foreach(EXAMPLE_SOURCE ${EXAMPLE_SOURCES})
     get_filename_component(EXAMPLE_NAME ${EXAMPLE_SOURCE} NAME_WE)
@@ -246,6 +247,7 @@ if(BUILD_EXAMPLES)
       TBB::tbb
       TBB::tbbmalloc
       PCL::PCL
+      Open3D::Open3D
     )
   endforeach()
 endif()

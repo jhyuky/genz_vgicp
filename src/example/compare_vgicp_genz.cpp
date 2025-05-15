@@ -62,6 +62,26 @@ struct Traits<pcl::KdTreeFLANN<pcl::PointXYZ>> {
 
 using namespace small_gicp;
 
+// PointT 타입 정의
+using PointT = pcl::PointXYZ;
+
+// VGICP 설정 구조체 정의
+struct VGICPSetting {
+  double voxel_size;
+  int num_threads;
+  double rotation_eps;
+  double translation_eps;
+  int max_iterations;
+};
+
+// GaussianVoxelMap 생성 함수
+template <typename PointCloud>
+std::shared_ptr<GaussianVoxelMap> create_gaussian_voxelmap(const PointCloud& points, double voxel_size) {
+  auto voxelmap = std::make_shared<GaussianVoxelMap>(voxel_size);
+  voxelmap->insert(points);
+  return voxelmap;
+}
+
 int main(int argc, char** argv) {
   if (argc < 3) {
     std::cerr << "Usage: " << argv[0] << " source.ply target.ply\n";
@@ -103,18 +123,18 @@ int main(int argc, char** argv) {
   std::cout << "After noise removal - Target points: " << target_downsampled->points_.size() << std::endl;
   std::cout << "After noise removal - Source points: " << source_downsampled->points_.size() << std::endl;
 
-  // Open3D 포인트 클라우드를 Eigen::Vector4f로 변환
-  std::vector<Eigen::Vector4f> target_points;
-  std::vector<Eigen::Vector4f> source_points;
+  // Open3D 포인트 클라우드를 Eigen::Vector4d로 변환
+  std::vector<Eigen::Vector4d> target_points;
+  std::vector<Eigen::Vector4d> source_points;
   
   target_points.reserve(target_downsampled->points_.size());
   for (const auto& pt : target_downsampled->points_) {
-    target_points.emplace_back(pt.x(), pt.y(), pt.z(), 1.0f);
+    target_points.emplace_back(pt.x(), pt.y(), pt.z(), 1.0);
   }
   
   source_points.reserve(source_downsampled->points_.size());
   for (const auto& pt : source_downsampled->points_) {
-    source_points.emplace_back(pt.x(), pt.y(), pt.z(), 1.0f);
+    source_points.emplace_back(pt.x(), pt.y(), pt.z(), 1.0);
   }
   
   if (target_points.empty() || source_points.empty()) {
@@ -130,7 +150,7 @@ int main(int argc, char** argv) {
 
   // 2) 전처리 설정
   int num_threads = 4;
-  double downsampling_resolution = 0.1;  // 더 작은 보셀 크기
+  double downsampling_resolution = 0.5;  // 보셀 크기 증가
   int num_neighbors = 20;  // 더 많은 이웃 포인트
 
   // 3) 포인트 클라우드 전처리
@@ -138,31 +158,69 @@ int main(int argc, char** argv) {
   auto [source, source_tree] = preprocess_points(source_points, downsampling_resolution, num_neighbors, num_threads);
 
   // 4) VGICP 설정
-  using VGICP = Registration<GICPFactor, ParallelReductionOMP>;
-  VGICP reg_vg;
-  reg_vg.point_factor.voxel_size = downsampling_resolution;
-  reg_vg.reduction.num_threads = num_threads;
-  reg_vg.criteria.rotation_eps = 0.1 * M_PI / 180.0;  // 회전 수렴 조건 완화
-  reg_vg.criteria.translation_eps = 1e-3;  // 이동 수렴 조건 완화
-  reg_vg.optimizer.max_iterations = 50;  // 최대 반복 횟수 감소
+  small_gicp::RegistrationSetting vgicp_setting;
+  vgicp_setting.type = small_gicp::RegistrationSetting::VGICP;
+  vgicp_setting.voxel_resolution = downsampling_resolution;
+  vgicp_setting.max_correspondence_distance = 2.0 * downsampling_resolution;  // 보셀 크기의 2배
+  vgicp_setting.num_threads = num_threads;
+  vgicp_setting.rotation_eps = 0.1 * M_PI / 180.0;  // 회전 수렴 조건
+  vgicp_setting.translation_eps = 1e-3;  // 이동 수렴 조건
+  vgicp_setting.max_iterations = 50;  // 최대 반복 횟수
+  vgicp_setting.verbose = true;
 
   // 5) GenZ-VGICP 설정
-  using GZICP = Registration<GenZVGICPFactor, ParallelReductionOMP>;
-  GZICP reg_gz;
-  reg_gz.point_factor.voxel_size = downsampling_resolution;
-  reg_gz.reduction.num_threads = num_threads;
-  reg_gz.criteria.rotation_eps = 0.1 * M_PI / 180.0;  // 회전 수렴 조건 완화
-  reg_gz.criteria.translation_eps = 1e-3;  // 이동 수렴 조건 완화
-  reg_gz.optimizer.max_iterations = 50;  // 최대 반복 횟수 감소
+  small_gicp::RegistrationSetting genz_setting;
+  genz_setting.type = small_gicp::RegistrationSetting::GICP;  // GICP 타입 사용
+  genz_setting.voxel_resolution = downsampling_resolution;
+  genz_setting.max_correspondence_distance = 2.0 * downsampling_resolution;
+  genz_setting.num_threads = num_threads;
+  genz_setting.rotation_eps = 1.0 * M_PI / 180.0;  // 회전 수렴 조건 더 완화
+  genz_setting.translation_eps = 1e-2;  // 이동 수렴 조건 더 완화
+  genz_setting.max_iterations = 50;  // 최대 반복 횟수
+  genz_setting.verbose = true;
 
-  // 6) 초기 변환 설정 - 단순화된 초기화
+  // 6) 초기 변환 설정
   Eigen::Isometry3d init = Eigen::Isometry3d::Identity();
-  init.translation() = Eigen::Vector3d(-15.0, 0.0, 0.0);  // 단순화된 초기 위치
-  init.linear() = Eigen::Matrix3d::Identity();  // 단순화된 초기 회전
+  
+  // 포인트 클라우드의 중심 계산
+  Eigen::Vector3d target_center = Eigen::Vector3d::Zero();
+  Eigen::Vector3d source_center = Eigen::Vector3d::Zero();
+  
+  for (const auto& pt : target_points) {
+    target_center += pt.head<3>().cast<double>();
+  }
+  target_center /= target_points.size();
+  
+  for (const auto& pt : source_points) {
+    source_center += pt.head<3>().cast<double>();
+  }
+  source_center /= source_points.size();
+  
+  // 초기 변환 설정
+  init.translation() = target_center - source_center;
+  init.linear() = Eigen::Matrix3d::Identity();
 
   // 7) 정합 실행
-  auto res_vg = reg_vg.align(*target, *source, *target_tree, init);
-  auto res_gz = reg_gz.align(*target, *source, *target_tree, init);
+  std::cout << "Running VGICP..." << std::endl;
+  // GaussianVoxelMap 생성
+  auto gmap = create_gaussian_voxelmap(*target, downsampling_resolution);
+  
+  // VGICP align 호출 (GaussianVoxelMap + VGICP 설정)
+  using VGICP = Registration<GICPFactor, ParallelReductionOMP>;
+  VGICP vgicp;
+  auto res_vg = vgicp.align(*gmap, *source, *gmap, init);
+  
+  std::cout << "Running GenZ-VGICP..." << std::endl;
+  // GenZ-VGICP align 호출 (GaussianVoxelMap + GenZ 설정)
+  using GenZVGICP = Registration<GenZVGICPFactor, ParallelReductionOMP>;
+  GenZVGICP genz_vgicp;
+  // 설정은 RegistrationSetting에서 가져옴
+  genz_vgicp.point_factor.voxel_size = genz_setting.voxel_resolution;
+  genz_vgicp.reduction.num_threads = genz_setting.num_threads;
+  genz_vgicp.criteria.rotation_eps = genz_setting.rotation_eps;
+  genz_vgicp.criteria.translation_eps = genz_setting.translation_eps;
+  genz_vgicp.optimizer.max_iterations = genz_setting.max_iterations;
+  auto res_gz = genz_vgicp.align(*gmap, *source, *gmap, init);
 
   // 8) 결과 출력
   std::cout << "\n--- VGICP ---\n"

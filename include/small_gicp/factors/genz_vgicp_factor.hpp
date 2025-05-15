@@ -108,9 +108,18 @@ struct GenZVGICPFactor {
     double e_pt = 0.5 * res3.squaredNorm();
 
     // 3) 이중 가중 블렌딩
-    double w_d2d = alpha_v;                              // 보셀 수준
-    double w_g_pl = (1.0 - alpha_v) * alpha_g;           // 평면 대응
-    double w_g_pt = (1.0 - alpha_v) * (1.0 - alpha_g);    // 점 대응
+    // 1. alpha_v로 VGICP와 GenZ의 비율 결정
+    // 2. alpha_g로 GenZ 내에서 P2Pl과 P2Pt의 비율 결정
+    double w_d2d = alpha_v;                              // VGICP 가중치
+    double w_genz = 1.0 - alpha_v;                       // GenZ 가중치
+    double w_g_pl = w_genz * alpha_g;                    // P2Pl 가중치
+    double w_g_pt = w_genz * (1.0 - alpha_g);            // P2Pt 가중치
+
+    // 가중치 정규화
+    double total_weight = w_d2d + w_g_pl + w_g_pt;
+    w_d2d /= total_weight;
+    w_g_pl /= total_weight;
+    w_g_pt /= total_weight;
 
     *H = w_d2d * H_d2d + w_g_pl * H_pl + w_g_pt * H_pt;  
     *b = w_d2d * b_d2d + w_g_pl * b_pl + w_g_pt * b_pt;

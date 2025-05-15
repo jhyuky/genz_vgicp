@@ -139,10 +139,15 @@ def visualize_ply_files(target_file, source_file, merged_genz_file, merged_vgicp
 
 def main():
     # PLY 파일 경로 설정
-    target_file = "/home/nvidia/paper_ws/src/small_gicp/target.ply"
-    source_file = "/home/nvidia/paper_ws/src/small_gicp/source.ply"
-    merged_genz_file = "/home/nvidia/paper_ws/src/small_gicp/merged_genz_vgicp.ply"
-    merged_vgicp_file = "/home/nvidia/paper_ws/src/small_gicp/merged_vgicp.ply"
+    # target_file = "/home/nvidia/paper_ws/src/small_gicp/target.ply"
+    # source_file = "/home/nvidia/paper_ws/src/small_gicp/source.ply"
+    # merged_genz_file = "/home/nvidia/paper_ws/src/small_gicp/merged_genz_vgicp.ply"
+    # merged_vgicp_file = "/home/nvidia/paper_ws/src/small_gicp/merged_vgicp.ply"
+
+    target_file = "/home/nvidia/paper_ws/src/small_gicp/target_offset.ply"
+    source_file = "/home/nvidia/paper_ws/src/small_gicp/source_offset.ply"
+    merged_genz_file = "/home/nvidia/paper_ws/src/small_gicp/merged_genz_vgicp_offset.ply"
+    merged_vgicp_file = "/home/nvidia/paper_ws/src/small_gicp/merged_vgicp_offset.ply"
     
     visualize_ply_files(target_file, source_file, merged_genz_file, merged_vgicp_file)
 

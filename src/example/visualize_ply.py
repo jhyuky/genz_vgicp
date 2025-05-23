@@ -66,21 +66,21 @@ def visualize_ply_files(target_file, source_file, merged_genz_file, merged_vgicp
     
     # 렌더링 옵션 설정 (Target & Source)
     opt1 = vis1.get_render_option()
-    opt1.point_size = 2.0  # 포인트 크기 조정
+    opt1.point_size = 0.8  # 포인트 크기 조정
     opt1.background_color = np.asarray([1, 1, 1])  # 흰색 배경
     opt1.light_on = True
     opt1.line_width = 2.0  # 라인 두께 증가
     
     # 렌더링 옵션 설정 (GenZ-VGICP)
     opt2 = vis2.get_render_option()
-    opt2.point_size = 2.0  # 포인트 크기 조정
+    opt2.point_size = 0.8  # 포인트 크기 조정
     opt2.background_color = np.asarray([1, 1, 1])  # 흰색 배경
     opt2.light_on = True
     opt2.line_width = 2.0  # 라인 두께 증가
     
     # 렌더링 옵션 설정 (VGICP)
     opt3 = vis3.get_render_option()
-    opt3.point_size = 2.0  # 포인트 크기 조정
+    opt3.point_size = 0.8  # 포인트 크기 조정
     opt3.background_color = np.asarray([1, 1, 1])  # 흰색 배경
     opt3.light_on = True
     opt3.line_width = 2.0  # 라인 두께 증가
@@ -144,10 +144,10 @@ def main():
     # merged_genz_file = "/home/nvidia/paper_ws/src/small_gicp/merged_genz_vgicp.ply"
     # merged_vgicp_file = "/home/nvidia/paper_ws/src/small_gicp/merged_vgicp.ply"
 
-    target_file = "/home/nvidia/paper_ws/src/small_gicp/target_offset.ply"
-    source_file = "/home/nvidia/paper_ws/src/small_gicp/source_offset.ply"
-    merged_genz_file = "/home/nvidia/paper_ws/src/small_gicp/merged_genz_vgicp_offset.ply"
-    merged_vgicp_file = "/home/nvidia/paper_ws/src/small_gicp/merged_vgicp_offset.ply"
+    target_file = "/home/nvidia/paper_ws/src/small_gicp/build/target.ply"
+    source_file = "/home/nvidia/paper_ws/src/small_gicp/build/source.ply"
+    merged_genz_file = "/home/nvidia/paper_ws/src/small_gicp/build/merged_genz_vgicp.ply"
+    merged_vgicp_file = "/home/nvidia/paper_ws/src/small_gicp/build/merged_vgicp.ply"
     
     visualize_ply_files(target_file, source_file, merged_genz_file, merged_vgicp_file)
 

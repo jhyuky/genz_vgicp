@@ -1,6 +1,6 @@
 #include <iostream>
 #include <Eigen/Geometry>
-#include <chrono>  // 시간 측정용 헤더 추가
+#include <chrono>
 
 // 헤더
 #include <small_gicp/ann/incremental_voxelmap.hpp>
@@ -108,7 +108,7 @@ int main(int argc, char** argv) {
   std::cout << "Source point cloud loaded. Points: " << source_cloud_o3d->points_.size() << std::endl;
 
   // 다운샘플링
-  double voxel_size = 0.5;  // 50cm voxel size로 증가
+  double voxel_size = 0.5;  // 50cm voxel size
   std::cout << "Downsampling point clouds with voxel size: " << voxel_size << std::endl;
   
   auto target_downsampled = target_cloud_o3d->VoxelDownSample(voxel_size);
@@ -151,8 +151,8 @@ int main(int argc, char** argv) {
 
   // 2) 전처리 설정
   int num_threads = 4;
-  double downsampling_resolution = 0.5;  // 보셀 크기 증가
-  int num_neighbors = 20;  // 더 많은 이웃 포인트
+  double downsampling_resolution = 0.5;
+  int num_neighbors = 20;
 
   // 3) 포인트 클라우드 전처리
   auto [target, target_tree] = preprocess_points(target_points, downsampling_resolution, num_neighbors, num_threads);
@@ -169,13 +169,16 @@ int main(int argc, char** argv) {
   vgicp_setting.max_iterations = 50;
   vgicp_setting.verbose = true;
 
-  // 5) GenZ-VGICP 설정
+  // 5) GenZ-VGICP 설정 (adaptive 버전)
   GenZVGICPFactor::Setting genz_factor_setting;
   genz_factor_setting.voxel_size = voxel_size;
-  genz_factor_setting.alpha_v = 0.2;
-  genz_factor_setting.alpha_g = 0.8;
+  // alpha_v는 correspondence마다 adaptive하게 계산되므로 Setting 구조체에 존재하지 않습니다.
+  genz_factor_setting.alpha_g = 0.8;  // P2Pl vs P2Pt 가중치
   genz_factor_setting.error_scale = 1.0;
   genz_factor_setting.use_combined_cov = true;
+  // 평면성 임계값 설정
+  genz_factor_setting.v_min = 0.2;  // 평면성 하한 임계값 (이하: GenZ-ICP만)
+  genz_factor_setting.v_max = 0.8;  // 평면성 상한 임계값 (이상: VGICP만)
 
   Registration<GenZVGICPFactor, ParallelReductionOMP> genz_vgicp;
   genz_vgicp.point_factor = genz_factor_setting;
@@ -188,39 +191,39 @@ int main(int argc, char** argv) {
 
   // 6) 초기 변환 설정
   Eigen::Isometry3d init = Eigen::Isometry3d::Identity();
-  
-  // // 포인트 클라우드의 중심 계산
-  // Eigen::Vector3d target_center = Eigen::Vector3d::Zero();
-  // Eigen::Vector3d source_center = Eigen::Vector3d::Zero();
-  
-  // for (const auto& pt : target_points) {
-  //   target_center += pt.head<3>().cast<double>();
-  // }
-  // target_center /= target_points.size();
-  
-  // for (const auto& pt : source_points) {
-  //   source_center += pt.head<3>().cast<double>();
-  // }
-  // source_center /= source_points.size();
-  
-  // // 초기 변환 설정
-  // init.translation() = target_center - source_center;
-  // init.linear() = Eigen::Matrix3d::Identity();
 
-  // Teaser ++ 사용한 초기 변환 행렬 설정
-  Eigen::Matrix4d init_matrix;
-  init_matrix << 0.998769760132, 0.044464513659, 0.021951656789, -2.019068956375,
-                -0.044545717537, 0.999002158642, 0.003224032931, 2.398455381393,
-                -0.021786397323, -0.004197918810, 0.999753832817, 0.923875689507,
-                0.000000000000, 0.000000000000, 0.000000000000, 1.000000000000;
+  // 포인트 클라우드의 중심 계산
+  Eigen::Vector3d target_center = Eigen::Vector3d::Zero();
+  Eigen::Vector3d source_center = Eigen::Vector3d::Zero();
   
-  init.matrix() = init_matrix;
+  for (const auto& pt : target_points) {
+    target_center += pt.head<3>().cast<double>();
+  }
+  target_center /= target_points.size();
+  
+  for (const auto& pt : source_points) {
+    source_center += pt.head<3>().cast<double>();
+  }
+  source_center /= source_points.size();
+  
+  // 초기 변환 설정
+  init.translation() = target_center - source_center;
+  init.linear() = Eigen::Matrix3d::Identity();
+  
+  // // Teaser ++ 사용한 초기 변환 행렬 설정
+  // Eigen::Matrix4d init_matrix;
+  // init_matrix << 0.999999344349, 0.001154619269, -0.000132486559, 0.054880205542,
+  //               -0.001154665370, 0.999999284744, -0.000348161178, 0.045637980103,
+  //               0.000132084475, 0.000348313915, 0.999999940395, 0.008304588497,
+  //               0.000000000000, 0.000000000000, 0.000000000000, 1.000000000000;
+
+  // init.matrix() = init_matrix;
 
   // 7) 정합 실행
   std::cout << "Running VGICP..." << std::endl;
   // GaussianVoxelMap 생성 및 설정
   auto gmap = create_gaussian_voxelmap(*target, downsampling_resolution);
-  gmap->set_search_offsets(27);  // VGICP의 기본값 사용
+  gmap->set_search_offsets(27);
 
   // VGICP 시간 측정 시작
   auto vgicp_start = std::chrono::high_resolution_clock::now();
@@ -241,10 +244,10 @@ int main(int argc, char** argv) {
   auto vgicp_end = std::chrono::high_resolution_clock::now();
   auto vgicp_duration = std::chrono::duration_cast<std::chrono::milliseconds>(vgicp_end - vgicp_start);
 
-  std::cout << "Running GenZ-VGICP..." << std::endl;
+  std::cout << "Running Adaptive GenZ-VGICP..." << std::endl;
   // GenZ-VGICP용 새로운 GaussianVoxelMap 생성
   auto gmap_genz = create_gaussian_voxelmap(*target, voxel_size);
-  gmap_genz->set_search_offsets(27);  // GenZ-VGICP용 설정
+  gmap_genz->set_search_offsets(27);
 
   // GenZ-VGICP 시간 측정 시작
   auto genz_start = std::chrono::high_resolution_clock::now();
@@ -264,7 +267,7 @@ int main(int argc, char** argv) {
             << "Execution time: " << vgicp_duration.count() << " ms\n"
             << "Time per iteration: " << vgicp_duration.count() / res_vg.iterations << " ms\n";
 
-  std::cout << "\n--- GenZ-VGICP ---\n"
+  std::cout << "\n--- Adaptive GenZ-VGICP ---\n"
             << "RMSE: " << res_gz.error << "\n"
             << "Transform:\n" << res_gz.T_target_source.matrix() << "\n"
             << "Iterations: " << res_gz.iterations << "\n"
@@ -274,19 +277,18 @@ int main(int argc, char** argv) {
 
   // 시간 비교 출력
   std::cout << "\n--- 시간 비교 ---\n"
-            << "VGICP vs GenZ-VGICP 속도 비율: " 
+            << "VGICP vs Adaptive GenZ-VGICP 속도 비율: " 
             << static_cast<double>(vgicp_duration.count()) / genz_duration.count() << "x\n"
-            << "(>1이면 GenZ-VGICP가 더 빠름)\n\n";
+            << "(>1이면 Adaptive GenZ-VGICP가 더 빠름)\n\n";
 
   // 9) 두 변환의 차이 계산
   Eigen::Isometry3d delta = res_gz.T_target_source * res_vg.T_target_source.inverse();
   std::cout << "\n--- 변환 차이 ---\n" << delta.matrix() << "\n";
 
   // 10) 정합된 source 포인트 클라우드를 변환하여 병합 결과를 PLY로 저장
-  pcl::PointCloud<pcl::PointXYZ>::Ptr genz_cloud(new pcl::PointCloud<pcl::PointXYZ>());        // GenZ-VGICP 결과
   pcl::PointCloud<pcl::PointXYZ>::Ptr vgicp_cloud(new pcl::PointCloud<pcl::PointXYZ>());       // VGICP 결과
-  pcl::PointCloud<pcl::PointXYZ>::Ptr merged_genz(new pcl::PointCloud<pcl::PointXYZ>());       // GenZ-VGICP 병합
   pcl::PointCloud<pcl::PointXYZ>::Ptr merged_vgicp(new pcl::PointCloud<pcl::PointXYZ>());      // VGICP 병합
+  pcl::PointCloud<pcl::PointXYZ>::Ptr merged_genz_vgicp(new pcl::PointCloud<pcl::PointXYZ>()); // GenZ-VGICP 병합
   pcl::PointCloud<pcl::PointXYZ>::Ptr target_cloud(new pcl::PointCloud<pcl::PointXYZ>());
   pcl::PointCloud<pcl::PointXYZ>::Ptr source_cloud(new pcl::PointCloud<pcl::PointXYZ>());
 
@@ -295,8 +297,8 @@ int main(int argc, char** argv) {
     pcl::PointXYZ p;
     p.x = pt[0]; p.y = pt[1]; p.z = pt[2];
     target_cloud->push_back(p);
-    merged_genz->push_back(p);    // GenZ 병합에 추가
-    merged_vgicp->push_back(p);   // VGICP 병합에 추가
+    merged_vgicp->push_back(p);      // VGICP 병합에 추가
+    merged_genz_vgicp->push_back(p); // GenZ-VGICP 병합에 추가
   }
 
   // source 포인트 변환 및 저장
@@ -310,15 +312,6 @@ int main(int argc, char** argv) {
     pcl_source.z = pt[2];
     source_cloud->push_back(pcl_source);
     
-    // GenZ-VGICP 결과
-    Eigen::Vector4d p_trans_genz = res_gz.T_target_source * p;
-    pcl::PointXYZ pcl_p_genz;
-    pcl_p_genz.x = p_trans_genz[0];
-    pcl_p_genz.y = p_trans_genz[1];
-    pcl_p_genz.z = p_trans_genz[2];
-    genz_cloud->push_back(pcl_p_genz);     // 결과만 저장
-    merged_genz->push_back(pcl_p_genz);    // 병합에 추가
-    
     // VGICP 결과
     Eigen::Vector4d p_trans_vgicp = res_vg.T_target_source * p;
     pcl::PointXYZ pcl_p_vgicp;
@@ -326,27 +319,33 @@ int main(int argc, char** argv) {
     pcl_p_vgicp.y = p_trans_vgicp[1];
     pcl_p_vgicp.z = p_trans_vgicp[2];
     vgicp_cloud->push_back(pcl_p_vgicp);    // 결과만 저장
-    merged_vgicp->push_back(pcl_p_vgicp);   // 병합에 추가
+    merged_vgicp->push_back(pcl_p_vgicp);   // VGICP 병합에 추가
+    
+    // GenZ-VGICP 결과
+    Eigen::Vector4d p_trans_genz = res_gz.T_target_source * p;
+    pcl::PointXYZ pcl_p_genz;
+    pcl_p_genz.x = p_trans_genz[0];
+    pcl_p_genz.y = p_trans_genz[1];
+    pcl_p_genz.z = p_trans_genz[2];
+    merged_genz_vgicp->push_back(pcl_p_genz); // GenZ-VGICP 병합에 추가
   }
 
   // PLY 파일로 저장
-  pcl::io::savePLYFile("genz_result.ply", *genz_cloud);              // GenZ-VGICP 결과만
-  pcl::io::savePLYFile("vgicp_result.ply", *vgicp_cloud);           // VGICP 결과만
-  pcl::io::savePLYFile("merged_genz_vgicp.ply", *merged_genz);      // GenZ-VGICP 병합
-  pcl::io::savePLYFile("merged_vgicp.ply", *merged_vgicp);          // VGICP 병합
-  pcl::io::savePLYFile("target.ply", *target_cloud);                // 원본 target
-  pcl::io::savePLYFile("source.ply", *source_cloud);                // 원본 source
+  pcl::io::savePLYFile("target.ply", *target_cloud);                         // 원본 target
+  pcl::io::savePLYFile("source.ply", *source_cloud);                         // 원본 source
+  pcl::io::savePLYFile("vgicp_result.ply", *vgicp_cloud);                    // VGICP 결과만
+  pcl::io::savePLYFile("merged_vgicp.ply", *merged_vgicp);                   // VGICP 병합
+  pcl::io::savePLYFile("merged_genz_vgicp.ply", *merged_genz_vgicp);         // GenZ-VGICP 병합
   
   std::cout << "\n결과 파일 저장 완료:" << std::endl;
-  std::cout << "1. 변환 결과만:" << std::endl;
-  std::cout << "  - GenZ-VGICP: genz_result.ply" << std::endl;
-  std::cout << "  - VGICP: vgicp_result.ply" << std::endl;
-  std::cout << "2. 병합 결과:" << std::endl;
-  std::cout << "  - GenZ-VGICP: merged_genz_vgicp.ply" << std::endl;
-  std::cout << "  - VGICP: merged_vgicp.ply" << std::endl;
-  std::cout << "3. 원본 데이터:" << std::endl;
+  std::cout << "1. 원본 데이터:" << std::endl;
   std::cout << "  - Target: target.ply" << std::endl;
   std::cout << "  - Source: source.ply" << std::endl;
+  std::cout << "2. VGICP 결과:" << std::endl;
+  std::cout << "  - 결과만: vgicp_result.ply" << std::endl;
+  std::cout << "  - 병합: merged_vgicp.ply" << std::endl;
+  std::cout << "3. GenZ-VGICP 결과:" << std::endl;
+  std::cout << "  - 병합: merged_genz_vgicp.ply" << std::endl;
 
   return 0;
 }

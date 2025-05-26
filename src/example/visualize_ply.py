@@ -144,10 +144,10 @@ def main():
     # merged_genz_file = "/home/nvidia/paper_ws/src/small_gicp/merged_genz_vgicp.ply"
     # merged_vgicp_file = "/home/nvidia/paper_ws/src/small_gicp/merged_vgicp.ply"
 
-    target_file = "/home/nvidia/paper_ws/src/small_gicp/build/target.ply"
-    source_file = "/home/nvidia/paper_ws/src/small_gicp/build/source.ply"
-    merged_genz_file = "/home/nvidia/paper_ws/src/small_gicp/build/merged_genz_vgicp.ply"
-    merged_vgicp_file = "/home/nvidia/paper_ws/src/small_gicp/build/merged_vgicp.ply"
+    target_file = "/home/nvidia/paper_ws/genz_vgicp/build/target.ply"
+    source_file = "/home/nvidia/paper_ws/genz_vgicp/build/source.ply"
+    merged_genz_file = "/home/nvidia/paper_ws/genz_vgicp/build/merged_genz_vgicp.ply"
+    merged_vgicp_file = "/home/nvidia/paper_ws/genz_vgicp/build/merged_vgicp.ply"
     
     visualize_ply_files(target_file, source_file, merged_genz_file, merged_vgicp_file)
 

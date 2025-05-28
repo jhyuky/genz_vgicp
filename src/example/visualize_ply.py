@@ -26,7 +26,7 @@ def visualize_ply_files(target_file, source_file, merged_genz_file, merged_vgicp
     # 각 포인트 클라우드에 색상 지정 (더 진한 색상으로 변경)
     target_pcd.paint_uniform_color([0.8, 0.2, 0.2])  # 진한 빨간색
     source_pcd.paint_uniform_color([0.2, 0.8, 0.2])  # 진한 초록색
-    merged_genz_pcd.paint_uniform_color([0.2, 0.2, 0.8])  # 진한 파란색
+    merged_genz_pcd.paint_uniform_color([0.0, 1.0, 0.0])  # 진한 파란색
     merged_vgicp_pcd.paint_uniform_color([0.8, 0.2, 0.8])  # 진한 보라색
     
     # 포인트 크기 설정
